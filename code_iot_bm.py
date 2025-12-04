@@ -3,81 +3,82 @@ import pandas as pd
 import numpy as np
 import time
 
-# --- Game Constants ---
-STARTING_CASH = 20.0  # Million USD
+# --- Game Constants & Difficulty Settings ---
+STARTING_CASH = 15.0  # Million USD
 QUARTERS_TOTAL = 12
-WINNING_VALUATION = 200.0 
+WINNING_VALUATION = 150.0 
 
-# Cost Structures
-HOLDING_COST_PER_UNIT = 0.5  # Cost to store spare parts
-STOCKOUT_PENALTY = 2.0       # Cost of not having a part when needed
-HARDWARE_MARGIN = 0.15       # Slim margin on steel
-SERVICE_MARGIN = 0.40        # Margin on labor/contracts
-PARTS_MARGIN = 0.60          # High margin on spare parts (The Trap)
+# Business Model Dynamics
+# Margin: Profitability %
+# Lag: Quarters before revenue starts flowing
+# Cannibalization: How much $1 of this revenue reduces Traditional Hardware revenue
+MODELS = {
+    "Traditional": {"margin": 0.15, "cannibalization": 0.0},
+    "Service":     {"margin": 0.35, "cannibalization": 0.3}, # Apex Concept: Reducing spare parts sales
+    "Process":     {"margin": 0.55, "cannibalization": 0.1},
+    "Cloud":       {"margin": 0.85, "cannibalization": 0.0} 
+}
 
 # --- State Initialization ---
 if 'game_active' not in st.session_state:
     st.session_state.game_active = True
     st.session_state.quarter = 1
     st.session_state.cash = STARTING_CASH
+    st.session_state.valuation = 0
     st.session_state.logs = []
     
-    # Core Business Metrics
-    st.session_state.installed_base = 1000 # Number of machines in market
-    st.session_state.contract_mix = {"Transactional": 100, "Outcome": 0} # % Split
+    # Metrics
+    st.session_state.revenue = {"Traditional": 12.0, "Service": 0.0, "Process": 0.0, "Cloud": 0.0}
+    st.session_state.metrics = {
+        "Tech_Maturity": 10.0,  # Quality of the product
+        "Sales_Morale": 80.0,   # Ability to sell (Apex Concept)
+        "Customer_Trust": 40.0  # Willingness to buy digital (Orion Concept)
+    }
     
-    # Hidden Variables (The "Engine")
-    st.session_state.data_accuracy = 20.0 # Ability to predict failures
-    st.session_state.sales_culture = 50.0 # Ability to sell contracts
-    st.session_state.customer_trust = 40.0 # Willingness to sign contracts
-    
-    # External Factors
-    st.session_state.competitor_price = 1.0 # Index (1.0 = Parity)
-    
-    # History
-    st.session_state.history = pd.DataFrame(columns=['Quarter', 'Cash', 'Valuation', 'Rev_Mix'])
+    # History for Charts
+    st.session_state.history = pd.DataFrame(columns=['Quarter', 'Cash', 'Valuation', 'Revenue'])
 
 # --- Helper Functions ---
 def log_event(message, type="info"):
-    icon_map = {"info": "ℹ️", "warning": "⚠️", "danger": "🔥", "success": "✅", "money": "💰"}
-    icon = icon_map.get(type, "ℹ️")
+    icon = "ℹ️"
+    if type == "warning": icon = "⚠️"
+    if type == "danger": icon = "🔥"
+    if type == "success": icon = "✅"
     st.session_state.logs.insert(0, f"{icon} Q{st.session_state.quarter}: {message}")
 
-def calculate_valuation(rev_stream):
-    # Outcome revenue is valued 5x higher by Wall St than One-off Hardware revenue
-    val = (rev_stream["Hardware"] * 0.8) + \
-          (rev_stream["Parts"] * 1.0) + \
-          (rev_stream["Service"] * 5.0)
+def calculate_valuation():
+    # Valuation Multipliers based on revenue quality
+    # Hardware = 1x, Service = 3x, SaaS/Cloud = 10x
+    val = (st.session_state.revenue["Traditional"] * 1.0) + \
+          (st.session_state.revenue["Service"] * 3.0) + \
+          (st.session_state.revenue["Process"] * 6.0) + \
+          (st.session_state.revenue["Cloud"] * 10.0)
     return val
 
 # --- Main UI ---
-st.set_page_config(page_title="Apex-Orion Advanced Sim", layout="wide")
-st.title("🏭 Strategic Pivot: The Principal-Agent Simulator")
-st.markdown("""
-**Objective:** Maximise Valuation. **Constraint:** Don't run out of Cash.
-* **Game Theory:** Moving to 'Outcome' aligns incentives but kills your 'Spare Parts' cash cow.
-* **Supply Chain:** 'Lean' inventory saves money but risks stockouts if your Data isn't good.
-""")
+st.set_page_config(page_title="Apex-Orion Strategy Sim", layout="wide")
+st.title("🏭 Industrial IoT Strategy Simulator")
+st.markdown("### Challenge: Survive the 'Swallow the Fish' Curve")
+st.caption("Based on Apex Precision & Orion Logistics Case Studies")
 
-# Sidebar
+# Sidebar Stats
 with st.sidebar:
     st.header(f"QUARTER {st.session_state.quarter} / {QUARTERS_TOTAL}")
     
     cash_color = "normal"
-    if st.session_state.cash < 5.0: cash_color = "off"
+    if st.session_state.cash < 3.0: cash_color = "off" # Red
     st.metric("Cash Reserves", f"${st.session_state.cash:.1f}M", delta_color=cash_color)
     
-    # Show Contract Mix
-    df_mix = pd.DataFrame([st.session_state.contract_mix])
-    st.write("### Contract Mix (The Game)")
-    st.bar_chart(df_mix.T)
+    current_val = calculate_valuation()
+    st.metric("Company Valuation", f"${current_val:.1f}M")
     
     st.divider()
-    st.write("### 📊 Operational Health")
-    st.progress(st.session_state.data_accuracy/100, text="Data Accuracy (Prediction)")
-    st.progress(st.session_state.sales_culture/100, text="Sales Culture (Hunter vs Farmer)")
-    st.progress(st.session_state.customer_trust/100, text="Customer Trust (Principal)")
+    st.write("### 📊 Organization Health")
+    st.progress(st.session_state.metrics["Tech_Maturity"]/100, text="Tech Maturity (Product)")
+    st.progress(st.session_state.metrics["Sales_Morale"]/100, text="Sales Morale (Culture)")
+    st.progress(st.session_state.metrics["Customer_Trust"]/100, text="Customer Trust (Brand)")
     
+    st.divider()
     if st.button("Restart Simulation"):
         for key in list(st.session_state.keys()):
             del st.session_state[key]
@@ -85,14 +86,23 @@ with st.sidebar:
 
 # --- Game Over Check ---
 if st.session_state.cash < 0:
-    st.error("💔 BANKRUPTCY! You fell into the 'Swallow the Fish' cash trough.")
+    st.error("💔 BANKRUPTCY! You ran out of cash. The Board has fired you.")
     st.stop()
 
 if st.session_state.quarter > QUARTERS_TOTAL:
     st.success("🏁 Simulation Complete!")
-    # Recalculate final valuation
-    # (Placeholder logic for simplicity of display, real logic in loop)
-    st.balloons()
+    final_score = calculate_valuation()
+    st.metric("FINAL SCORE", f"${final_score:.1f}M")
+    if final_score > WINNING_VALUATION:
+        st.balloons()
+        st.markdown("### 🏆 GRADE: A (Visionary)")
+        st.write("You successfully navigated the transition, balancing cash flow with high-growth innovation.")
+    elif final_score > 80:
+        st.markdown("### 🥈 GRADE: B (Survivor)")
+        st.write("You survived, but failed to unlock exponential value.")
+    else:
+        st.markdown("### 🥉 GRADE: C (Stagnant)")
+        st.write("You protected the core but missed the digital revolution.")
     st.stop()
 
 # --- Decision Dashboard ---
@@ -100,139 +110,128 @@ col1, col2 = st.columns([1.5, 1])
 
 with col1:
     with st.form("turn_form"):
-        st.subheader("1. Resource Allocation ($M)")
+        st.subheader("Quarterly Decisions")
+        st.info("Budget Limit: Spending > $2.5M per quarter burns into Cash Reserves.")
+        
         c1, c2, c3 = st.columns(3)
         with c1:
-            invest_iot = st.number_input("IoT R&D", 0.0, 5.0, 0.0, step=0.5, help="Improves Data Accuracy. Reduces Inventory Risk.")
+            spend_rd = st.number_input("R&D Investment ($M)", 0.0, 5.0, 0.5, step=0.5, help="Improves Tech Maturity. Enables Cloud/Process models.")
         with c2:
-            invest_train = st.number_input("Sales Training", 0.0, 5.0, 0.0, step=0.5, help="Improves Sales Culture. Allows shifting to Outcome contracts.")
+            spend_change = st.number_input("Change Mgmt ($M)", 0.0, 5.0, 0.5, step=0.5, help="Training & Incentives. Improves Sales Morale.")
         with c3:
-            invest_brand = st.number_input("Brand/Trust", 0.0, 5.0, 0.0, step=0.5, help="Improves Trust. Protects against Competitor Price Cuts.")
-
+            spend_marketing = st.number_input("Go-To-Market ($M)", 0.0, 5.0, 0.5, step=0.5, help="Pilots & Branding. Improves Customer Trust.")
+        
         st.divider()
-        st.subheader("2. Strategic Moves")
         
-        # Game Theory Move
-        st.markdown("**Contract Strategy (Principal-Agent):**")
-        contract_target = st.slider("Target % of Clients on 'Outcome-Based' Contracts", 0, 100, st.session_state.contract_mix["Outcome"], help="Moving here creates recurring revenue but kills spare parts sales.")
-        
-        # Supply Chain Move
-        st.markdown("**Inventory Strategy (Supply Chain):**")
-        inventory_strat = st.select_slider("Spare Parts Inventory Level", options=["Lean (JIT)", "Balanced", "Hoard (Safe)"], value="Balanced")
+        st.markdown("**Strategic Priority (Select One):**")
+        strategy = st.radio("Focus:", [
+            "Defend Core (Hardware)",
+            "Launch Service (Predictive Maint)", 
+            "Launch Process (Optimization)", 
+            "Launch Cloud (Platform)"
+        ], horizontal=True)
         
         submit = st.form_submit_button("👉 Execute Quarter")
 
 with col2:
-    st.subheader("Market News")
-    for log in st.session_state.logs[:5]:
+    st.subheader("Event Log")
+    for log in st.session_state.logs[:4]:
         st.write(log)
+    
+    st.subheader("Revenue Mix")
+    rev_df = pd.DataFrame.from_dict(st.session_state.revenue, orient='index', columns=['Revenue'])
+    st.bar_chart(rev_df)
 
-# --- Simulation Logic ---
+# --- Game Logic Engine ---
 if submit:
-    # 0. Expenses
-    total_spend = invest_iot + invest_train + invest_brand
-    fixed_burn = 2.0
-    st.session_state.cash -= (total_spend + fixed_burn)
+    # 1. Financials
+    total_spend = spend_rd + spend_change + spend_marketing
+    burn_rate = 1.0 # Fixed Ops Cost
     
-    # 1. Update Capabilities
-    st.session_state.data_accuracy += (invest_iot * 5)
-    st.session_state.sales_culture += (invest_train * 4)
-    st.session_state.customer_trust += (invest_brand * 3)
+    # 2. Update Organizational Metrics (The "Soft" Skills)
+    # R&D increases Tech, but decays slightly
+    st.session_state.metrics["Tech_Maturity"] += (spend_rd * 4) - 1
     
-    # Competitor Move (The "SeoulHydra" Threat)
-    st.session_state.competitor_price -= 0.02 # Gets cheaper every quarter
-    if st.session_state.competitor_price < 0.8:
-        log_event("Competitor prices are now 20% lower than yours!", "warning")
+    # Change Mgmt increases Morale. If you spend 0, Morale tanks (Apex Scenario)
+    if spend_change < 0.5:
+        st.session_state.metrics["Sales_Morale"] -= 10
+        log_event("Sales team demoralized due to lack of training!", "warning")
+    else:
+        st.session_state.metrics["Sales_Morale"] += (spend_change * 3)
+        
+    # Marketing increases Trust
+    st.session_state.metrics["Customer_Trust"] += (spend_marketing * 3) - 0.5
+    
+    # Cap metrics at 100
+    for k in st.session_state.metrics:
+        st.session_state.metrics[k] = max(0, min(100, st.session_state.metrics[k]))
 
-    # 2. Contract Negotiation (Can we actually move clients?)
-    # We can only shift clients if Sales Culture + Trust are high enough
-    desired_shift = contract_target - st.session_state.contract_mix["Outcome"]
-    max_possible_shift = (st.session_state.sales_culture + st.session_state.customer_trust) / 10
+    # 3. Calculate Revenue Impact based on Strategy
     
-    actual_shift = min(desired_shift, max_possible_shift)
-    if desired_shift > 0 and actual_shift < desired_shift:
-        log_event("Sales team struggled to close Outcome contracts. Culture too low.", "warning")
+    # Multipliers based on Org Health
+    tech_factor = st.session_state.metrics["Tech_Maturity"] / 100
+    sales_factor = st.session_state.metrics["Sales_Morale"] / 100
+    trust_factor = st.session_state.metrics["Customer_Trust"] / 100
     
-    st.session_state.contract_mix["Outcome"] += actual_shift
-    st.session_state.contract_mix["Transactional"] = 100 - st.session_state.contract_mix["Outcome"]
+    # BASE DECLINE of Traditional Hardware (Commoditization)
+    st.session_state.revenue["Traditional"] *= 0.95 
+    
+    if strategy == "Defend Core (Hardware)":
+        st.session_state.revenue["Traditional"] *= 1.03 # Mitigate decline
+        
+    elif strategy == "Launch Service (Predictive Maint)":
+        # Low Tech requirement, High Sales requirement
+        growth = 1.5 * sales_factor
+        st.session_state.revenue["Service"] += growth
+        # Cannibalization Effect (Apex)
+        st.session_state.revenue["Traditional"] -= (growth * MODELS["Service"]["cannibalization"])
+        log_event("Service contracts growing. Spare parts revenue declining.", "info")
 
-    # 3. The "Event" (Random Breakdowns)
-    # The better your IoT Data, the fewer CATASTROPHIC breakdowns
-    base_breakdown_rate = 0.10 # 10% of machines break
-    preventable_rate = (st.session_state.data_accuracy / 100) * 0.8 # up to 80% preventable
-    actual_breakdowns = base_breakdown_rate * (1 - preventable_rate)
-    
-    num_broken = st.session_state.installed_base * actual_breakdowns
-    
-    # 4. Supply Chain Impact (The Bullwhip)
-    # Did we have the parts?
-    if inventory_strat == "Hoard (Safe)":
-        holding_cost = 3.0
-        stockout_chance = 0.0
-    elif inventory_strat == "Balanced":
-        holding_cost = 1.5
-        stockout_chance = 0.1 - (st.session_state.data_accuracy/200) # Data helps reduce risk
-    else: # Lean
-        holding_cost = 0.5
-        # If data is low, Lean is suicide
-        stockout_chance = 0.4 - (st.session_state.data_accuracy/200)
-    
-    stockout_chance = max(0, stockout_chance)
-    is_stockout = np.random.random() < stockout_chance
-    
-    sc_penalty = 0
-    if is_stockout:
-        sc_penalty = 3.0
-        st.session_state.customer_trust -= 10
-        log_event("Supply Chain Failure! Stockout on critical parts.", "danger")
-    
-    st.session_state.cash -= holding_cost
-    st.session_state.cash -= sc_penalty
+    elif strategy == "Launch Process (Optimization)":
+        # Needs Trust and Tech
+        if trust_factor > 0.5:
+            growth = 1.2 * tech_factor * trust_factor
+            st.session_state.revenue["Process"] += growth
+        else:
+            log_event("Process Launch Failed! Trust too low.", "danger")
+            
+    elif strategy == "Launch Cloud (Platform)":
+        # Needs High Tech & High Trust
+        if tech_factor > 0.7 and trust_factor > 0.7:
+            # Exponential Growth (J-Curve kicker)
+            existing = st.session_state.revenue["Cloud"]
+            growth = 1.0 + (existing * 0.4) # 40% QoQ growth
+            st.session_state.revenue["Cloud"] += growth
+            log_event("Cloud Platform scaling!", "success")
+        else:
+            log_event("Cloud Launch Disaster! Product buggy or no trust.", "danger")
+            st.session_state.metrics["Customer_Trust"] -= 10
+            st.session_state.cash -= 2.0 # Penalty for failed launch cleanup
 
-    # 5. Revenue Calculation (The Payoff Matrix)
+    # 4. Cash Flow Calculation
+    gross_profit = 0
+    for model, amt in st.session_state.revenue.items():
+        gross_profit += amt * MODELS[model]["margin"]
     
-    # Stream A: Transactional Clients (Adversarial)
-    # We make money when they break (Parts) + New Hardware Sales
-    # But Hardware sales decline if Competitor is cheaper and Trust is low
-    hardware_demand = 20 * st.session_state.competitor_price * (st.session_state.customer_trust / 50)
-    rev_hardware = hardware_demand * 1.0 # $1M per unit
+    net_change = gross_profit - total_spend - burn_rate
+    st.session_state.cash += net_change
     
-    # Parts Revenue (The Trap): Only from Transactional Clients
-    # Breakdown count * % Transactional
-    parts_demand = num_broken * (st.session_state.contract_mix["Transactional"] / 100)
-    rev_parts = parts_demand * 0.2 # $200k per part
-    
-    if invest_iot > 2.0 and rev_parts < 1.0:
-        log_event("Cannibalization! IoT prevented failures, killing Parts revenue.", "money")
+    # 5. Random Events (Chaos Monkey)
+    rng = np.random.random()
+    if st.session_state.quarter == 4 and rng > 0.3:
+        log_event("Competitor slashes hardware prices by 20%. Core revenue hit.", "warning")
+        st.session_state.revenue["Traditional"] *= 0.8
+    elif st.session_state.quarter == 8 and st.session_state.metrics["Tech_Maturity"] < 50:
+        log_event("Major sensor failure at client site! Trust tanks.", "danger")
+        st.session_state.metrics["Customer_Trust"] -= 20
+        st.session_state.cash -= 1.0
 
-    # Stream B: Outcome Clients (Cooperative)
-    # We make fixed fees, but pay for repairs
-    num_outcome_clients = st.session_state.installed_base * (st.session_state.contract_mix["Outcome"]/100)
-    rev_service = num_outcome_clients * 0.05 # Recurring fee
-    
-    # Cost of Service (We pay for the parts/labor now!)
-    cost_service = (num_broken * (st.session_state.contract_mix["Outcome"]/100)) * 0.15
-    
-    # 6. Total Cash Flow
-    gross_profit = (rev_hardware * HARDWARE_MARGIN) + \
-                   (rev_parts * PARTS_MARGIN) + \
-                   (rev_service) - cost_service
-                   
-    st.session_state.cash += gross_profit
-    
-    # Valuation
-    current_val = calculate_valuation({"Hardware": rev_hardware, "Parts": rev_parts, "Service": rev_service})
-    
-    # Logging
-    if st.session_state.cash < 5.0:
-        log_event("Cash critical! The J-Curve is hitting hard.", "danger")
-    
-    # Store History
+    # 6. Update History & Turn
     st.session_state.history = pd.concat([st.session_state.history, pd.DataFrame([{
         "Quarter": st.session_state.quarter,
         "Cash": st.session_state.cash,
-        "Valuation": current_val,
-        "Rev_Mix": f"{st.session_state.contract_mix['Outcome']}% Outcome"
+        "Valuation": calculate_valuation(),
+        "Revenue": sum(st.session_state.revenue.values())
     }])], ignore_index=True)
     
     st.session_state.quarter += 1
